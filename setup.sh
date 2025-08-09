@@ -32,7 +32,7 @@ echo "✅ Dependencies installed successfully"
 # Create .env.local file if it doesn't exist
 if [ ! -f .env.local ]; then
     echo "📝 Creating .env.local file..."
-    cp env.example .env.local
+    cp .env.example .env.local
     echo "✅ .env.local created from template"
     echo ""
     echo "⚠️  IMPORTANT: Please update .env.local with your actual credentials:"

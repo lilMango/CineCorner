@@ -53,22 +53,49 @@ Foster honest, supportive, and growth-oriented feedback for filmmakers — no ma
    cp .env.example .env.local
    ```
 
-4. Start the Dockerized database (recommended):
+4. **(Optional but Recommended)** Set up direnv for automatic environment loading:
+   
+   **Install direnv** (if not already installed):
+   ```bash
+   # macOS
+   brew install direnv
+   
+   # Ubuntu/Debian
+   sudo apt install direnv
+   ```
+   
+   **Add to your shell** (add one of these to your shell config):
+   ```bash
+   # For Zsh (~/.zshrc)
+   eval "$(direnv hook zsh)"
+   
+   # For Bash (~/.bashrc)
+   eval "$(direnv hook bash)"
+   ```
+   
+   **Allow direnv in this project**:
+   ```bash
+   direnv allow
+   ```
+   
+   Now environment variables will auto-load when you `cd` into the project! 🎉
+
+5. Start the Dockerized database (recommended):
    ```bash
    npm run db:up
    ```
 
-5. Set up the database schema:
+6. Set up the database schema:
    ```bash
    npm run db:push
    ```
 
-5. Run the development server:
+7. Run the development server:
    ```bash
    npm run dev
    ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:7070](http://localhost:7070) with your browser to see the result.
 
 ## 📝 Environment Variables
 
