@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useSession, signOut } from 'next-auth/react'
 import { 
   Home, 
   Upload, 
@@ -16,10 +17,10 @@ import {
   X,
   MessageCircle,
   Star,
-  Camera
+  Camera,
+  LogOut
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-// Auth disabled in no-auth mode; show placeholder avatar
 import { cn } from '@/lib/utils'
 
 const navigation = [
@@ -38,6 +39,24 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { data: session, status } = useSession()
+
+  // Redirect to sign in if not authenticated
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <Camera className="h-12 w-12 text-cinema-500 mx-auto mb-4 animate-pulse" />
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (status === 'unauthenticated') {
+    window.location.href = '/auth/signin'
+    return null
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -116,12 +135,34 @@ export default function DashboardLayout({
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700" />
+              {session?.user?.image ? (
+                <img 
+                  src={session.user.image} 
+                  alt={session.user.name || 'User'} 
+                  className="w-8 h-8 rounded-full"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-cinema-200 dark:bg-cinema-700 flex items-center justify-center">
+                  <User className="w-4 h-4 text-cinema-600 dark:text-cinema-300" />
+                </div>
+              )}
               <div className="text-sm">
-                <p className="font-medium text-gray-900 dark:text-white">Alex Rivera</p>
-                <p className="text-gray-500 dark:text-gray-400">@alexfilms</p>
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {session?.user?.name || 'User'}
+                </p>
+                <p className="text-gray-500 dark:text-gray-400">
+                  @{session?.user?.username || 'username'}
+                </p>
               </div>
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => signOut({ callbackUrl: '/' })}
+              className="p-1 h-auto"
+            >
+              <LogOut className="w-4 h-4" />
+            </Button>
           </div>
         </div>
       </div>

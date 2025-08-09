@@ -99,10 +99,10 @@ export default function HomePage() {
               </Link>
             </div>
             <div className="flex items-center space-x-4">
-              <Link href="/sign-in">
-                <Button variant="ghost">Sign In</Button>
-              </Link>
-              <Link href="/sign-up">
+                          <Link href="/auth/signin">
+              <Button variant="ghost">Sign In</Button>
+            </Link>
+            <Link href="/auth/signup">
                 <Button variant="cinema">Get Started</Button>
               </Link>
             </div>
@@ -128,7 +128,7 @@ export default function HomePage() {
               and growth-oriented feedback for creators of all backgrounds.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-              <Link href="/sign-up">
+              <Link href="/auth/signup">
                 <Button size="lg" variant="cinema" className="text-lg px-8 py-4">
                   <Play className="mr-2 h-5 w-5" />
                   Start Your Journey
@@ -260,7 +260,7 @@ export default function HomePage() {
               meaningful feedback and community support.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/sign-up">
+              <Link href="/auth/signup">
                 <Button size="lg" variant="secondary" className="text-lg px-8 py-4">
                   <Zap className="mr-2 h-5 w-5" />
                   Start Creating Today

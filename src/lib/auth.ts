@@ -1,97 +1,75 @@
-import { auth } from '@clerk/nextjs'
+import { NextAuthOptions } from 'next-auth'
+import GoogleProvider from 'next-auth/providers/google'
+import { PrismaAdapter } from '@auth/prisma-adapter'
 import { db } from '@/lib/db'
 
-export async function getCurrentUser() {
-  const { userId } = auth()
-  
-  if (!userId) {
-    return null
-  }
-
-  try {
-    const user = await db.user.findUnique({
-      where: {
-        clerkId: userId,
-      },
-      include: {
-        films: {
-          orderBy: {
-            createdAt: 'desc',
+export const authOptions: NextAuthOptions = {
+  adapter: PrismaAdapter(db) as any,
+  providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
+  ],
+  callbacks: {
+    async session({ session, user }) {
+      if (session.user) {
+        session.user.id = user.id
+        // Add custom user fields
+        const dbUser = await db.user.findUnique({
+          where: { id: user.id },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            image: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            bio: true,
+            location: true,
+            website: true,
+            isFilmmaker: true,
+            createdAt: true,
           },
-          take: 5,
-        },
-        reviews: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-          take: 5,
-        },
-        followers: true,
-        following: true,
-        badges: {
-          include: {
-            badge: true,
-          },
-        },
-      },
-    })
+        })
+        if (dbUser) {
+          // If username is missing, generate one
+          if (!dbUser.username) {
+            const baseUsername = 
+              dbUser.name?.toLowerCase().replace(/\s+/g, '') || 
+              dbUser.email?.split('@')[0] || 
+              'user'
+            
+            let username = baseUsername
+            let counter = 1
+            while (await db.user.findUnique({ where: { username } })) {
+              username = `${baseUsername}${counter}`
+              counter++
+            }
 
-    return user
-  } catch (error) {
-    console.error('Error fetching current user:', error)
-    return null
-  }
-}
-
-export async function createUserIfNotExists(clerkUser: any) {
-  try {
-    const existingUser = await db.user.findUnique({
-      where: {
-        clerkId: clerkUser.id,
-      },
-    })
-
-    if (existingUser) {
-      return existingUser
-    }
-
-    const user = await db.user.create({
-      data: {
-        clerkId: clerkUser.id,
-        email: clerkUser.emailAddresses[0]?.emailAddress || '',
-        username: clerkUser.username || `user_${clerkUser.id.slice(-8)}`,
-        firstName: clerkUser.firstName || '',
-        lastName: clerkUser.lastName || '',
-        imageUrl: clerkUser.imageUrl || '',
-      },
-    })
-
-    return user
-  } catch (error) {
-    console.error('Error creating user:', error)
-    throw error
-  }
-}
-
-export async function updateUserProfile(userId: string, data: {
-  firstName?: string
-  lastName?: string
-  bio?: string
-  location?: string
-  website?: string
-  isFilmmaker?: boolean
-}) {
-  try {
-    const user = await db.user.update({
-      where: {
-        clerkId: userId,
-      },
-      data,
-    })
-
-    return user
-  } catch (error) {
-    console.error('Error updating user profile:', error)
-    throw error
-  }
+            // Update the user with username
+            await db.user.update({
+              where: { id: user.id },
+              data: { username },
+            })
+            dbUser.username = username
+          }
+          
+          session.user = { ...session.user, ...dbUser }
+        }
+      }
+      return session
+    },
+    async signIn({ user, account, profile }) {
+      return true // Let Prisma adapter handle user creation
+    },
+  },
+  pages: {
+    signIn: '/auth/signin',
+    signUp: '/auth/signup',
+  },
+  session: {
+    strategy: 'database',
+  },
 }

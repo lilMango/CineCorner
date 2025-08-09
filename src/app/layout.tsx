@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://cinecorner.app',
+    url: 'http://localhost:7070',
     title: 'CineCorner - Social Platform for Film Lovers & Filmmakers',
     description: 'Watch. Share. Review. Create. A safe space for honest, supportive, and growth-oriented feedback for filmmakers.',
     siteName: 'CineCorner',

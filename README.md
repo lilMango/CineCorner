@@ -36,9 +36,25 @@ Foster honest, supportive, and growth-oriented feedback for filmmakers — no ma
 - **Framework**: Next.js 14 with TypeScript
 - **Styling**: Tailwind CSS + Framer Motion
 - **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: Clerk
+- **Authentication**: NextAuth.js with Google OAuth
 - **File Upload**: UploadThing
 - **Video Player**: React Player
+- **Environment**: direnv for auto-loading variables
+
+## 📋 Prerequisites
+
+Before getting started, make sure you have:
+
+- **Node.js** 18+ and npm
+- **Docker** (for PostgreSQL database)
+- **direnv** (recommended for environment management)
+  ```bash
+  # macOS
+  brew install direnv
+  
+  # Ubuntu/Debian  
+  sudo apt install direnv
+  ```
 
 ## 🚀 Getting Started
 
@@ -53,16 +69,7 @@ Foster honest, supportive, and growth-oriented feedback for filmmakers — no ma
    cp .env.example .env.local
    ```
 
-4. **(Optional but Recommended)** Set up direnv for automatic environment loading:
-   
-   **Install direnv** (if not already installed):
-   ```bash
-   # macOS
-   brew install direnv
-   
-   # Ubuntu/Debian
-   sudo apt install direnv
-   ```
+4. Set up direnv for automatic environment loading (if you installed it in prerequisites):
    
    **Add to your shell** (add one of these to your shell config):
    ```bash
@@ -101,18 +108,35 @@ Open [http://localhost:7070](http://localhost:7070) with your browser to see the
 
 Create a `.env.local` file with:
 
-```
+```bash
 # Database (Docker default)
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/cinecorner?schema=public"
 
-# Clerk Authentication
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
-CLERK_SECRET_KEY=
+# NextAuth
+NEXTAUTH_SECRET=your-secret-key-here-change-this-in-production
+NEXTAUTH_URL=http://localhost:7070
+
+# Google OAuth (get from Google Cloud Console)
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 
 # UploadThing
-UPLOADTHING_SECRET=
-UPLOADTHING_APP_ID=
+UPLOADTHING_SECRET=sk_live_...
+UPLOADTHING_APP_ID=your-app-id
+
+# Next.js
+NEXT_PUBLIC_APP_URL=http://localhost:7070
 ```
+
+### 🔄 Auto-Loading with direnv
+
+If you set up direnv (step 4), environment variables will automatically load when you `cd` into the project directory. No need to manually source files or restart your terminal! 
+
+**Benefits:**
+- ✅ No more forgetting to load environment variables
+- ✅ Works across all terminal sessions
+- ✅ Automatically unloads when you leave the project
+- ✅ Perfect for team development
 
 ## 🐳 Dockerized Database
 
