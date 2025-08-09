@@ -1,0 +1,377 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String   @unique
+  username  String   @unique
+  firstName String?
+  lastName  String?
+  imageUrl  String?
+  bio       String?
+  location  String?
+  website   String?
+  isFilmmaker Boolean @default(false)
+  
+  // Social features
+  followers Follow[] @relation("UserFollowers")
+  following Follow[] @relation("UserFollowing")
+  
+  // Content
+  films       Film[]
+  reviews     Review[]
+  comments    Comment[]
+  lists       List[]
+  watchlogs   Watchlog[]
+  
+  // Feedback and moderation
+  feedbackGiven    Feedback[] @relation("FeedbackAuthor")
+  feedbackReceived Feedback[] @relation("FeedbackRecipient")
+  reports          Report[]
+  
+  // Rooms and collaboration
+  ownedRooms       FeedbackRoom[] @relation("RoomOwner")
+  roomMemberships  RoomMembership[]
+  
+  // Gamification
+  badges          UserBadge[]
+  reviewerRating  Float?      @default(0)
+  helpfulVotes    Int         @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("users")
+}
+
+model Follow {
+  id          String @id @default(cuid())
+  followerId  String
+  followingId String
+  
+  follower  User @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([followerId, followingId])
+  @@map("follows")
+}
+
+model Film {
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+  duration    Int?    // Duration in seconds
+  videoUrl    String
+  thumbnailUrl String?
+  
+  // Creator info
+  creatorId   String
+  creator     User   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  
+  // Metadata
+  genre       String?
+  tags        String[] // Array of tags
+  isPublic    Boolean  @default(true)
+  
+  // Feedback settings
+  feedbackMode FeedbackMode @default(OPEN)
+  creatorNote  String?      // Context for viewers
+  
+  // Stats
+  viewCount    Int @default(0)
+  averageRating Float?
+  
+  // Content
+  reviews     Review[]
+  comments    Comment[]
+  feedback    Feedback[]
+  watchlogs   Watchlog[]
+  listItems   ListItem[]
+  
+  // Production info
+  castCrew    CastCrew[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("films")
+}
+
+enum FeedbackMode {
+  OPEN        // Open to all feedback
+  REACTIONS   // Reactions only, no critique
+  PRIVATE     // Private feedback only
+  SUPPORT     // Support-only mode
+  COLLABORATORS // Looking for collaborators
+}
+
+model Review {
+  id      String @id @default(cuid())
+  rating  Int    // 1-5 stars
+  content String?
+  
+  filmId   String
+  film     Film   @relation(fields: [filmId], references: [id], onDelete: Cascade)
+  
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  // Social features
+  likes    ReviewLike[]
+  helpfulVotes Int @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([filmId, authorId])
+  @@map("reviews")
+}
+
+model ReviewLike {
+  id       String @id @default(cuid())
+  reviewId String
+  userId   String
+  
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([reviewId, userId])
+  @@map("review_likes")
+}
+
+model Comment {
+  id      String @id @default(cuid())
+  content String
+  
+  filmId   String
+  film     Film   @relation(fields: [filmId], references: [id], onDelete: Cascade)
+  
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  // Threading
+  parentId String?
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies  Comment[] @relation("CommentReplies")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("comments")
+}
+
+model Feedback {
+  id      String @id @default(cuid())
+  content String
+  type    FeedbackType
+  
+  // Timestamped feedback
+  timestamp Float? // Timestamp in video (seconds)
+  
+  filmId   String
+  film     Film   @relation(fields: [filmId], references: [id], onDelete: Cascade)
+  
+  authorId String
+  author   User   @relation("FeedbackAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  
+  recipientId String
+  recipient   User   @relation("FeedbackRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  
+  isPrivate Boolean @default(false)
+  isAnonymous Boolean @default(false)
+  
+  // Guided feedback prompts
+  promptType String? // "liked", "emotional", "confused", "suggestion", etc.
+  
+  createdAt DateTime @default(now())
+  
+  @@map("feedback")
+}
+
+enum FeedbackType {
+  POSITIVE
+  CONSTRUCTIVE
+  QUESTION
+  SUGGESTION
+  TECHNICAL
+}
+
+model Watchlog {
+  id     String @id @default(cuid())
+  
+  filmId String
+  film   Film   @relation(fields: [filmId], references: [id], onDelete: Cascade)
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  watchedAt DateTime @default(now())
+  
+  @@unique([filmId, userId])
+  @@map("watchlogs")
+}
+
+model List {
+  id          String @id @default(cuid())
+  title       String
+  description String?
+  isPublic    Boolean @default(true)
+  
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  items ListItem[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("lists")
+}
+
+model ListItem {
+  id       String @id @default(cuid())
+  position Int
+  notes    String?
+  
+  listId String
+  list   List   @relation(fields: [listId], references: [id], onDelete: Cascade)
+  
+  filmId String
+  film   Film   @relation(fields: [filmId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([listId, filmId])
+  @@map("list_items")
+}
+
+model CastCrew {
+  id   String @id @default(cuid())
+  name String
+  role String // "Director", "Actor", "Editor", etc.
+  
+  filmId String
+  film   Film   @relation(fields: [filmId], references: [id], onDelete: Cascade)
+  
+  userId String? // If they're a platform user
+  user   User?   @relation(fields: [userId], references: [id])
+  
+  @@map("cast_crew")
+}
+
+// Feedback Rooms for private collaboration
+model FeedbackRoom {
+  id          String @id @default(cuid())
+  name        String
+  description String?
+  
+  ownerId String
+  owner   User   @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  members     RoomMembership[]
+  inviteCode  String?          @unique // Optional invite code
+  isPrivate   Boolean          @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("feedback_rooms")
+}
+
+model RoomMembership {
+  id     String @id @default(cuid())
+  role   RoomRole @default(MEMBER)
+  
+  roomId String
+  room   FeedbackRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  joinedAt DateTime @default(now())
+  
+  @@unique([roomId, userId])
+  @@map("room_memberships")
+}
+
+enum RoomRole {
+  OWNER
+  MODERATOR
+  MEMBER
+}
+
+// Gamification and Community Features
+model Badge {
+  id          String @id @default(cuid())
+  name        String @unique
+  description String
+  iconUrl     String?
+  category    BadgeCategory
+  
+  users UserBadge[]
+  
+  @@map("badges")
+}
+
+enum BadgeCategory {
+  REVIEWER
+  CREATOR
+  COMMUNITY
+  MILESTONE
+}
+
+model UserBadge {
+  id String @id @default(cuid())
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  badgeId String
+  badge   Badge  @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  
+  earnedAt DateTime @default(now())
+  
+  @@unique([userId, badgeId])
+  @@map("user_badges")
+}
+
+// Moderation and Safety
+model Report {
+  id      String @id @default(cuid())
+  reason  String
+  content String?
+  status  ReportStatus @default(PENDING)
+  
+  reporterId String
+  reporter   User   @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  
+  // What's being reported (polymorphic)
+  targetType String // "film", "review", "comment", "user"
+  targetId   String
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("reports")
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
