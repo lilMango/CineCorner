@@ -37,7 +37,7 @@ Foster honest, supportive, and growth-oriented feedback for filmmakers — no ma
 - **Styling**: Tailwind CSS + Framer Motion
 - **Database**: PostgreSQL with Prisma ORM
 - **Authentication**: NextAuth.js with Google OAuth
-- **File Upload**: UploadThing
+- **File Storage**: Cloudflare R2
 - **Video Player**: React Player
 - **Environment**: direnv for auto-loading variables
 
@@ -120,9 +120,12 @@ NEXTAUTH_URL=http://localhost:7070
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 
-# UploadThing
-UPLOADTHING_SECRET=sk_live_...
-UPLOADTHING_APP_ID=your-app-id
+# Cloudflare R2 (File Storage)
+CLOUDFLARE_R2_ACCESS_KEY_ID=your_access_key_id
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=your_secret_access_key
+CLOUDFLARE_R2_BUCKET_NAME=cinecorner-films
+CLOUDFLARE_R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
+CLOUDFLARE_R2_PUBLIC_URL=https://pub-your-bucket-id.r2.dev
 
 # Next.js
 NEXT_PUBLIC_APP_URL=http://localhost:7070

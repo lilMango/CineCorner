@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
+import { useDropzone } from 'react-dropzone'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,12 +17,17 @@ import {
   X,
   Plus,
   Video,
-  Image as ImageIcon
+  Image as ImageIcon,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { useR2Upload } from '@/hooks/useR2Upload'
 
 export default function UploadPage() {
   const [uploadStep, setUploadStep] = useState(1)
+  const [uploadedFile, setUploadedFile] = useState<any>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [filmData, setFilmData] = useState({
     title: '',
     description: '',
@@ -32,10 +38,9 @@ export default function UploadPage() {
     creatorNote: '',
     castCrew: [] as { name: string; role: string }[],
   })
-  
-  const [dragActive, setDragActive] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [isUploading, setIsUploading] = useState(false)
+
+  const { uploadFile, isUploading, uploadProgress } = useR2Upload()
+  const [isPublishing, setIsPublishing] = useState(false)
 
   const feedbackModes = [
     {
@@ -112,27 +117,90 @@ export default function UploadPage() {
     }))
   }
 
-  const handleFileDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setDragActive(false)
-    // Handle file upload logic here
-  }
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0]
+    if (!file) return
 
-  const simulateUpload = () => {
-    setIsUploading(true)
-    setUploadProgress(0)
-    
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setIsUploading(false)
-          setUploadStep(2)
-          return 100
-        }
-        return prev + 10
+    setUploadError(null)
+
+    try {
+      const result = await uploadFile(file)
+      setUploadedFile({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        url: result.publicUrl,
+        key: result.key
       })
-    }, 200)
+      setUploadStep(2) // Move to metadata step
+    } catch (error) {
+      console.error('Upload failed:', error)
+      setUploadError(error instanceof Error ? error.message : 'Upload failed. Please try again.')
+    }
+  }, [uploadFile])
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'video/*': ['.mp4', '.mov', '.avi', '.quicktime'],
+      'image/*': ['.jpeg', '.jpg', '.png', '.webp']
+    },
+    maxFiles: 1,
+    disabled: isUploading
+  })
+
+  const handlePublishFilm = async () => {
+    if (!uploadedFile) {
+      alert('Please upload a file first')
+      return
+    }
+
+    if (!filmData.title.trim()) {
+      alert('Please enter a film title')
+      return
+    }
+
+    setIsPublishing(true)
+
+    try {
+      // Create the film record in the database
+      const filmPayload = {
+        title: filmData.title,
+        description: filmData.description,
+        genre: filmData.genre,
+        duration: filmData.duration ? parseInt(filmData.duration) : null,
+        videoUrl: uploadedFile.url,
+        videoKey: uploadedFile.key,
+        tags: filmData.tags,
+        feedbackMode: filmData.feedbackMode,
+        creatorNote: filmData.creatorNote,
+        castCrew: filmData.castCrew.filter(person => person.name && person.role)
+      }
+
+      const response = await fetch('/api/films', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(filmPayload),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to publish film')
+      }
+
+      const newFilm = await response.json()
+      
+      // Redirect to the film page or dashboard
+      alert('🎉 Film published successfully!')
+      window.location.href = `/film/${newFilm.id}`
+
+    } catch (error) {
+      console.error('Publish failed:', error)
+      alert('Failed to publish film. Please try again.')
+    } finally {
+      setIsPublishing(false)
+    }
   }
 
   return (
@@ -200,35 +268,42 @@ export default function UploadPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {!isUploading ? (
+                {uploadError && (
+                  <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <div className="flex items-center">
+                      <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+                      <p className="text-red-700 dark:text-red-300">{uploadError}</p>
+                    </div>
+                  </div>
+                )}
+
+                {!isUploading && !uploadedFile ? (
                   <div
-                    className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
-                      dragActive 
+                    {...getRootProps()}
+                    className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${
+                      isDragActive 
                         ? 'border-cinema-500 bg-cinema-50 dark:bg-cinema-900/20' 
                         : 'border-gray-300 dark:border-gray-600 hover:border-cinema-400'
                     }`}
-                    onDragEnter={() => setDragActive(true)}
-                    onDragLeave={() => setDragActive(false)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={handleFileDrop}
                   >
+                    <input {...getInputProps()} />
                     <Video className="mx-auto h-16 w-16 text-gray-400 mb-4" />
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                      Drop your video file here
+                      {isDragActive ? 'Drop your file here' : 'Drop your video file here'}
                     </h3>
                     <p className="text-gray-600 dark:text-gray-400 mb-4">
                       or click to browse your files
                     </p>
-                    <Button variant="cinema" onClick={simulateUpload}>
+                    <Button variant="cinema" type="button">
                       Choose File
                     </Button>
                     <p className="text-xs text-gray-500 mt-4">
-                      Maximum file size: 500MB. Recommended: 1920x1080, H.264 encoding
+                      Video: MP4, MOV, AVI (max 500MB) • Image: JPG, PNG, WebP (max 10MB)
                     </p>
                   </div>
-                ) : (
+                ) : isUploading ? (
                   <div className="text-center py-12">
-                    <Video className="mx-auto h-16 w-16 text-cinema-500 mb-4" />
+                    <Video className="mx-auto h-16 w-16 text-cinema-500 mb-4 animate-pulse" />
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                       Uploading your film...
                     </h3>
@@ -243,6 +318,22 @@ export default function UploadPage() {
                     <p className="text-gray-600 dark:text-gray-400">
                       {uploadProgress}% complete
                     </p>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <CheckCircle className="mx-auto h-16 w-16 text-green-500 mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                      Upload Complete!
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-4">
+                      {uploadedFile.name} ({(uploadedFile.size / (1024 * 1024)).toFixed(1)} MB)
+                    </p>
+                    <Button variant="outline" onClick={() => {
+                      setUploadedFile(null)
+                      setUploadStep(1)
+                    }}>
+                      Upload Different File
+                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -493,8 +584,13 @@ export default function UploadPage() {
               <Button variant="outline" onClick={() => setUploadStep(2)}>
                 Back
               </Button>
-              <Button variant="cinema" size="lg">
-                Publish Film
+              <Button 
+                variant="cinema" 
+                size="lg"
+                onClick={handlePublishFilm}
+                disabled={isPublishing || !uploadedFile || !filmData.title.trim()}
+              >
+                {isPublishing ? 'Publishing...' : 'Publish Film'}
               </Button>
             </div>
           </motion.div>
