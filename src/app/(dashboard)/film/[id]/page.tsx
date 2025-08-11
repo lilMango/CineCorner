@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import { useFeedback } from '@/hooks/useFeedback'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -21,10 +22,13 @@ import {
   Clock,
   ChevronRight,
   Plus,
-  Film
+  Film,
+  Trash2,
+  Edit3
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import ReactPlayer from 'react-player'
+import { DeleteFilmDialog } from '@/components/ui/delete-film-dialog'
 
 interface Film {
   id: string
@@ -76,6 +80,7 @@ interface Film {
 }
 
 export default function FilmPage({ params }: { params: { id: string } }) {
+  const { data: session } = useSession()
   const [film, setFilm] = useState<Film | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -86,6 +91,7 @@ export default function FilmPage({ params }: { params: { id: string } }) {
   const [userRating, setUserRating] = useState(0)
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [isFollowing, setIsFollowing] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const playerRef = useRef<ReactPlayer>(null)
   
   // Use our feedback hook
@@ -125,6 +131,15 @@ export default function FilmPage({ params }: { params: { id: string } }) {
   const handleRating = (rating: number) => {
     setUserRating(rating)
     setHasRated(true)
+  }
+
+  const handleDeleteClick = () => {
+    setShowDeleteDialog(true)
+  }
+
+  const handleDeleteConfirmed = () => {
+    // Redirect to My Films page after deletion
+    window.location.href = '/my-films'
   }
 
   const formatDuration = (seconds?: number) => {
@@ -234,6 +249,26 @@ export default function FilmPage({ params }: { params: { id: string } }) {
                   </div>
                   
                   <div className="flex items-center space-x-2">
+                    {/* Creator-only actions */}
+                    {session?.user?.id === film.creator.id && (
+                      <>
+                        <Button variant="outline" size="sm">
+                          <Edit3 className="mr-2 h-4 w-4" />
+                          Edit
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+                          onClick={handleDeleteClick}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </Button>
+                      </>
+                    )}
+                    
+                    {/* Regular user actions */}
                     <Button
                       variant={isBookmarked ? "default" : "outline"}
                       size="sm"
@@ -340,8 +375,11 @@ export default function FilmPage({ params }: { params: { id: string } }) {
                     feedback={film.feedback.map(item => ({
                       ...item,
                       type: (item.type as "POSITIVE" | "CONSTRUCTIVE" | "QUESTION" | "SUGGESTION" | "TECHNICAL") || "CONSTRUCTIVE",
+                      promptType: item.promptType || "",
                       author: item.author ? {
-                        ...item.author,
+                        id: item.author.id,
+                        name: item.author.name || 'Unknown User',
+                        username: item.author.username || 'unknown',
                         imageUrl: item.author.image,
                         isAnonymous: item.isAnonymous
                       } : {
@@ -513,6 +551,17 @@ export default function FilmPage({ params }: { params: { id: string } }) {
         filmId={film.id}
         currentTime={currentTime}
       />
+
+      {/* Delete Film Dialog */}
+      {film && (
+        <DeleteFilmDialog
+          filmId={film.id}
+          filmTitle={film.title}
+          isOpen={showDeleteDialog}
+          onClose={() => setShowDeleteDialog(false)}
+          onDeleted={handleDeleteConfirmed}
+        />
+      )}
     </div>
   )
 }

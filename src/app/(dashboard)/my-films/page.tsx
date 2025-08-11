@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { DeleteFilmDialog } from '@/components/ui/delete-film-dialog'
 
 interface FilmStats {
   reviews: number
@@ -49,6 +50,15 @@ export default function MyFilmsPage() {
   const [films, setFilms] = useState<MyFilm[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean
+    filmId: string
+    filmTitle: string
+  }>({
+    isOpen: false,
+    filmId: '',
+    filmTitle: '',
+  })
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -70,6 +80,31 @@ export default function MyFilmsPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleDeleteClick = (film: MyFilm) => {
+    setDeleteDialog({
+      isOpen: true,
+      filmId: film.id,
+      filmTitle: film.title,
+    })
+  }
+
+  const handleDeleteClose = () => {
+    setDeleteDialog({
+      isOpen: false,
+      filmId: '',
+      filmTitle: '',
+    })
+  }
+
+  const handleDeleteConfirmed = () => {
+    // Remove the deleted film from the list
+    setFilms(prevFilms => 
+      prevFilms.filter(film => film.id !== deleteDialog.filmId)
+    )
+    // Optionally refetch to ensure consistency
+    fetchMyFilms()
   }
 
   const formatDuration = (seconds?: number) => {
@@ -263,7 +298,12 @@ export default function MyFilmsPage() {
                           <Button variant="ghost" size="sm">
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-red-500 hover:text-red-700"
+                            onClick={() => handleDeleteClick(film)}
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -272,6 +312,20 @@ export default function MyFilmsPage() {
                     
                     <CardContent>
                       <div className="space-y-4">
+                        {/* Thumbnail */}
+                        {film.thumbnailUrl && (
+                          <div className="relative">
+                            <img 
+                              src={film.thumbnailUrl} 
+                              alt={`${film.title} thumbnail`}
+                              className="w-full h-32 object-cover rounded-lg"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
+                              <Play className="h-12 w-12 text-white opacity-0 hover:opacity-100 transition-opacity" />
+                            </div>
+                          </div>
+                        )}
+                        
                         {/* Film metadata */}
                         <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400">
                           {film.genre && (
@@ -339,6 +393,15 @@ export default function MyFilmsPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Film Dialog */}
+      <DeleteFilmDialog
+        filmId={deleteDialog.filmId}
+        filmTitle={deleteDialog.filmTitle}
+        isOpen={deleteDialog.isOpen}
+        onClose={handleDeleteClose}
+        onDeleted={handleDeleteConfirmed}
+      />
     </div>
   )
 }
