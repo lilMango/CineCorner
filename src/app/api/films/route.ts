@@ -11,6 +11,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Verify user exists in database (after DB reset, JWT tokens may reference deleted users)
+    const userExists = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true }
+    })
+    
+    if (!userExists) {
+      return NextResponse.json(
+        { error: 'User not found. Please sign out and sign in again.' },
+        { status: 401 }
+      )
+    }
+
     const {
       title,
       description,

@@ -23,11 +23,15 @@ import {
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useR2Upload } from '@/hooks/useR2Upload'
+import { useThumbnailGeneration } from '@/hooks/useThumbnailGeneration'
+import { useSession } from 'next-auth/react'
 
 export default function UploadPage() {
+  const { data: session, status } = useSession()
   const [uploadStep, setUploadStep] = useState(1)
   const [uploadedFile, setUploadedFile] = useState<any>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadedThumbnail, setUploadedThumbnail] = useState<any>(null)
   const [filmData, setFilmData] = useState({
     title: '',
     description: '',
@@ -41,6 +45,19 @@ export default function UploadPage() {
 
   const { uploadFile, isUploading, uploadProgress } = useR2Upload()
   const [isPublishing, setIsPublishing] = useState(false)
+  
+  // Thumbnail generation
+  const {
+    isGenerating: isGeneratingThumbnail,
+    isUploading: isUploadingThumbnail,
+    thumbnailOptions,
+    selectedThumbnail,
+    error: thumbnailError,
+    generateThumbnails,
+    uploadSelectedThumbnail,
+    selectThumbnail,
+    clearThumbnails
+  } = useThumbnailGeneration()
 
   const feedbackModes = [
     {
@@ -124,6 +141,7 @@ export default function UploadPage() {
     setUploadError(null)
 
     try {
+      // Upload video file
       const result = await uploadFile(file)
       setUploadedFile({
         name: file.name,
@@ -132,12 +150,27 @@ export default function UploadPage() {
         url: result.publicUrl,
         key: result.key
       })
+
+      // Generate thumbnails for video files
+      if (file.type.startsWith('video/')) {
+        try {
+          await generateThumbnails(file)
+        } catch (thumbnailError) {
+          console.warn('Thumbnail generation failed:', thumbnailError)
+          // Don't block the upload process if thumbnail generation fails
+        }
+      }
+
       setUploadStep(2) // Move to metadata step
     } catch (error) {
       console.error('Upload failed:', error)
-      setUploadError(error instanceof Error ? error.message : 'Upload failed. Please try again.')
+      if (error instanceof Error && error.message.includes('Authentication required')) {
+        setUploadError('Please sign in to upload files. Your session may have expired.')
+      } else {
+        setUploadError(error instanceof Error ? error.message : 'Upload failed. Please try again.')
+      }
     }
-  }, [uploadFile])
+  }, [uploadFile, generateThumbnails])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -163,6 +196,22 @@ export default function UploadPage() {
     setIsPublishing(true)
 
     try {
+      // Upload thumbnail if one is selected
+      let thumbnailUrl = null
+      let thumbnailKey = null
+      
+      if (selectedThumbnail) {
+        try {
+          const thumbnailResult = await uploadSelectedThumbnail()
+          thumbnailUrl = thumbnailResult.publicUrl
+          thumbnailKey = thumbnailResult.key
+          setUploadedThumbnail(thumbnailResult)
+        } catch (thumbnailError) {
+          console.warn('Thumbnail upload failed:', thumbnailError)
+          // Continue without thumbnail if upload fails
+        }
+      }
+
       // Create the film record in the database
       const filmPayload = {
         title: filmData.title,
@@ -171,6 +220,8 @@ export default function UploadPage() {
         duration: filmData.duration ? parseInt(filmData.duration) : null,
         videoUrl: uploadedFile.url,
         videoKey: uploadedFile.key,
+        thumbnailUrl,
+        thumbnailKey,
         tags: filmData.tags,
         feedbackMode: filmData.feedbackMode,
         creatorNote: filmData.creatorNote,
@@ -186,7 +237,8 @@ export default function UploadPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to publish film')
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || 'Failed to publish film')
       }
 
       const newFilm = await response.json()
@@ -197,10 +249,50 @@ export default function UploadPage() {
 
     } catch (error) {
       console.error('Publish failed:', error)
-      alert('Failed to publish film. Please try again.')
+      
+      // Provide specific error messages
+      if (error instanceof Error && error.message.includes('User not found')) {
+        alert('❌ Session expired. Please sign out and sign in again to continue.')
+      } else {
+        alert(`❌ Failed to publish film: ${error instanceof Error ? error.message : 'Please try again.'}`)
+      }
     } finally {
       setIsPublishing(false)
     }
+  }
+
+  // Authentication check
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <Upload className="h-12 w-12 text-cinema-500 mx-auto mb-4 animate-pulse" />
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            Sign in to Upload
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+            You need to be signed in to upload films to CineCorner. Please sign in to continue.
+          </p>
+          <Button 
+            variant="cinema" 
+            onClick={() => window.location.href = '/auth/signin'}
+          >
+            Sign In
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -451,6 +543,96 @@ export default function UploadPage() {
               </CardContent>
             </Card>
 
+            {/* Thumbnail Selection */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <ImageIcon className="mr-2 h-5 w-5" />
+                  Choose Thumbnail
+                </CardTitle>
+                <CardDescription>
+                  Select a thumbnail that represents your film
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isGeneratingThumbnail ? (
+                  <div className="text-center py-8">
+                    <ImageIcon className="mx-auto h-12 w-12 text-cinema-500 mb-4 animate-pulse" />
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Generating thumbnails from your video...
+                    </p>
+                  </div>
+                ) : thumbnailError ? (
+                  <div className="text-center py-8">
+                    <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+                    <p className="text-red-600 dark:text-red-400 mb-4">
+                      {thumbnailError}
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        if (uploadedFile?.type?.startsWith('video/')) {
+                          // Recreate file object for retry
+                          fetch(uploadedFile.url)
+                            .then(response => response.blob())
+                            .then(blob => {
+                              const file = new File([blob], uploadedFile.name, { type: uploadedFile.type })
+                              generateThumbnails(file)
+                            })
+                        }
+                      }}
+                    >
+                      Try Again
+                    </Button>
+                  </div>
+                ) : thumbnailOptions.length > 0 ? (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Choose one of these automatically generated thumbnails:
+                    </p>
+                    <div className="grid grid-cols-3 gap-4">
+                      {thumbnailOptions.map((option, index) => (
+                        <div
+                          key={index}
+                          className={`relative cursor-pointer rounded-lg border-2 transition-all ${
+                            selectedThumbnail === option
+                              ? 'border-cinema-500 ring-2 ring-cinema-200'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                          onClick={() => selectThumbnail(option)}
+                        >
+                          <img
+                            src={option.previewUrl}
+                            alt={`Thumbnail option ${index + 1}`}
+                            className="w-full h-24 object-cover rounded-md"
+                          />
+                          {selectedThumbnail === option && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-cinema-500 bg-opacity-20 rounded-md">
+                              <CheckCircle className="h-8 w-8 text-cinema-500" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {selectedThumbnail && (
+                      <div className="text-center">
+                        <p className="text-sm text-green-600 dark:text-green-400">
+                          ✓ Thumbnail selected
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <p className="text-gray-600 dark:text-gray-400">
+                      No thumbnail generated yet
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Cast & Crew */}
             <Card>
               <CardHeader>
@@ -588,9 +770,11 @@ export default function UploadPage() {
                 variant="cinema" 
                 size="lg"
                 onClick={handlePublishFilm}
-                disabled={isPublishing || !uploadedFile || !filmData.title.trim()}
+                disabled={isPublishing || isUploadingThumbnail || !uploadedFile || !filmData.title.trim()}
               >
-                {isPublishing ? 'Publishing...' : 'Publish Film'}
+                {isPublishing 
+                  ? (isUploadingThumbnail ? 'Uploading thumbnail...' : 'Publishing...') 
+                  : 'Publish Film'}
               </Button>
             </div>
           </motion.div>

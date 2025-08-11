@@ -25,7 +25,6 @@ model User {
   isFilmmaker   Boolean   @default(false)
   
   accounts Account[]
-  sessions Session[]
   
   // Social features
   followers Follow[] @relation("UserFollowers")
@@ -78,16 +77,6 @@ model Account {
 
   @@unique([provider, providerAccountId])
   @@map("accounts")
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("sessions")
 }
 
 model VerificationToken {

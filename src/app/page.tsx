@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import { useSession, signOut } from 'next-auth/react'
 
 const features = [
   {
@@ -77,6 +78,8 @@ const testimonials = [
 ]
 
 export default function HomePage() {
+  const { data: session, status } = useSession()
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       {/* Navigation */}
@@ -99,12 +102,33 @@ export default function HomePage() {
               </Link>
             </div>
             <div className="flex items-center space-x-4">
-                          <Link href="/auth/signin">
-              <Button variant="ghost">Sign In</Button>
-            </Link>
-            <Link href="/auth/signup">
-                <Button variant="cinema">Get Started</Button>
-              </Link>
+              {status === 'loading' ? (
+                <div className="w-8 h-8 animate-pulse bg-gray-200 rounded-full"></div>
+              ) : session ? (
+                // Signed in user
+                <div className="flex items-center space-x-3">
+                  <Link href="/dashboard">
+                    <Button variant="ghost">Dashboard</Button>
+                  </Link>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => signOut({ callbackUrl: '/logout' })}
+                    className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+                  >
+                    Sign Out
+                  </Button>
+                </div>
+              ) : (
+                // Not signed in
+                <>
+                  <Link href="/auth/signin">
+                    <Button variant="ghost">Sign In</Button>
+                  </Link>
+                  <Link href="/auth/signup">
+                    <Button variant="cinema">Get Started</Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>

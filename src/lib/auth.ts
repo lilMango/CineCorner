@@ -12,10 +12,9 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id
-        // Add custom user fields
+    async jwt({ token, user, account }) {
+      // On sign in, add user info to token
+      if (user) {
         const dbUser = await db.user.findUnique({
           where: { id: user.id },
           select: {
@@ -33,6 +32,7 @@ export const authOptions: NextAuthOptions = {
             createdAt: true,
           },
         })
+
         if (dbUser) {
           // If username is missing, generate one
           if (!dbUser.username) {
@@ -56,8 +56,15 @@ export const authOptions: NextAuthOptions = {
             dbUser.username = username
           }
           
-          session.user = { ...session.user, ...dbUser }
+          token.user = dbUser
         }
+      }
+      return token
+    },
+    async session({ session, token }) {
+      // Send properties to the client
+      if (token.user) {
+        session.user = token.user as any
       }
       return session
     },
@@ -70,6 +77,7 @@ export const authOptions: NextAuthOptions = {
     signUp: '/auth/signup',
   },
   session: {
-    strategy: 'database',
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
 }

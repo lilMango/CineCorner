@@ -15,14 +15,13 @@ const s3Client = new S3Client({
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication (mock for upload, real for publish)
+    // Check authentication - uploads require valid session
     const session = await getServerSession()
     if (!session?.user?.email) {
-      // For upload endpoint, allow with mock session
-      // Real auth will be checked when publishing
-      const mockSession = { user: { email: 'test@example.com' } }
-      // Continue with mock session for upload
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
+    
+    const userEmail = session.user.email
 
     const { fileName, fileType, fileSize } = await request.json()
 
@@ -45,7 +44,7 @@ export async function POST(request: NextRequest) {
     // Generate unique file key
     const fileExtension = fileName.split('.').pop()
     const uniqueFileName = `${uuidv4()}.${fileExtension}`
-    const key = `uploads/${session.user.email}/${uniqueFileName}`
+    const key = `uploads/${userEmail}/${uniqueFileName}`
 
     // Generate presigned URL for upload
     const command = new PutObjectCommand({

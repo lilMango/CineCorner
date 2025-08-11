@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
@@ -39,7 +39,23 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
   const { data: session, status } = useSession()
+  const userMenuRef = useRef<HTMLDivElement>(null)
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
 
   // Redirect to sign in if not authenticated
   if (status === 'loading') {
@@ -133,7 +149,7 @@ export default function DashboardLayout({
 
         {/* User info at bottom */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
+          <div className="space-y-3">
             <div className="flex items-center space-x-3">
               {session?.user?.image ? (
                 <img 
@@ -146,22 +162,25 @@ export default function DashboardLayout({
                   <User className="w-4 h-4 text-cinema-600 dark:text-cinema-300" />
                 </div>
               )}
-              <div className="text-sm">
-                <p className="font-medium text-gray-900 dark:text-white">
+              <div className="text-sm flex-1 min-w-0">
+                <p className="font-medium text-gray-900 dark:text-white truncate">
                   {session?.user?.name || 'User'}
                 </p>
-                <p className="text-gray-500 dark:text-gray-400">
-                  @{session?.user?.username || 'username'}
+                <p className="text-gray-500 dark:text-gray-400 truncate">
+                  {session?.user?.email || 'user@example.com'}
                 </p>
               </div>
             </div>
+            
+            {/* Logout Button */}
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              onClick={() => signOut({ callbackUrl: '/' })}
-              className="p-1 h-auto"
+              onClick={() => signOut({ callbackUrl: '/logout' })}
+              className="w-full flex items-center justify-center space-x-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 border-gray-200 dark:border-gray-600"
             >
               <LogOut className="w-4 h-4" />
+              <span>Sign Out</span>
             </Button>
           </div>
         </div>
@@ -205,6 +224,65 @@ export default function DashboardLayout({
                 <button className="sm:hidden p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
                   <Search className="h-5 w-5 text-gray-600 dark:text-gray-300" />
                 </button>
+
+                {/* User menu for mobile/desktop */}
+                <div className="relative" ref={userMenuRef}>
+                  <button 
+                    className="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                  >
+                    {session?.user?.image ? (
+                      <img 
+                        src={session.user.image} 
+                        alt={session.user.name || 'User'} 
+                        className="w-6 h-6 rounded-full"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-cinema-200 dark:bg-cinema-700 flex items-center justify-center">
+                        <User className="w-3 h-3 text-cinema-600 dark:text-cinema-300" />
+                      </div>
+                    )}
+                    <span className="hidden sm:block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {session?.user?.name || 'User'}
+                    </span>
+                  </button>
+
+                  {/* User dropdown menu */}
+                  {showUserMenu && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                      <div className="py-1">
+                        <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                            {session?.user?.name || 'User'}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {session?.user?.email || 'user@example.com'}
+                          </p>
+                        </div>
+                        
+                        <Link href="/my-films" className="block px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                          <div className="flex items-center space-x-2">
+                            <Film className="w-4 h-4" />
+                            <span>My Films</span>
+                          </div>
+                        </Link>
+                        
+                        <button 
+                          onClick={() => {
+                            setShowUserMenu(false)
+                            signOut({ callbackUrl: '/logout' })
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <LogOut className="w-4 h-4" />
+                            <span>Sign Out</span>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
